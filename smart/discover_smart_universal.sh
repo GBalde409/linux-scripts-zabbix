@@ -1,10 +1,8 @@
 #!/bin/bash
-# Universal SMART Discovery for Zabbix (Discos Diretos + Hardware RAID)
 
 echo "["
 first=1
 
-# Função para montar o objeto JSON
 add_disk() {
     local path=$1
     local type=$2
@@ -14,7 +12,7 @@ add_disk() {
     first=0
 }
 
-# 1. Descoberta de discos normais (SATA, NVMe, USB, etc) via scan nativo
+# 1. Discos Diretos (SATA, NVMe, etc)
 while read -r line; do
     if [[ -z "$line" || "$line" == "#"* ]]; then continue; fi
     path=$(echo "$line" | awk '{print $1}')
@@ -23,27 +21,29 @@ while read -r line; do
     add_disk "$path" "$type" "$name"
 done < <(sudo /usr/sbin/smartctl --scan)
 
-# Mapeia apenas block devices reais para economizar tempo no probing do RAID
-BLOCK_DEVS=$(lsblk -nd -o NAME | grep -E "^sd|^nvme" | awk '{print "/dev/"$1}')
-
-# 2. Sondagem para HP Smart Array (cciss)
+# 2. Varredura Otimizada para HP Smart Array (Procura apenas controladoras reais e evita loops cegos)
 if lspci | grep -i -E "Hewlett-Packard Company Smart Array" >/dev/null 2>&1; then
-    for dev in $BLOCK_DEVS; do
-        for id in {0..15}; do
-            # Testa silenciosamente se o disco físico responde
+    # Descobre dinamicamente quais controladoras cciss ou volumes respondem instantaneamente
+    for dev in /dev/sd[a-z]; do
+        [ -e "$dev" ] || continue
+        # Testa apenas os primeiros IDs de forma rápida
+        for id in {0..3}; do
             if sudo /usr/sbin/smartctl -i -d cciss,$id "$dev" >/dev/null 2>&1; then
-                add_disk "$dev" "cciss,$id" "$(basename "$dev")_cciss_$id"
+                add_disk "$dev" "cciss,$id" "$(basename "$dev")_hp_$id"
+                break # Achou o disco válido neste device, pula para o próximo
             fi
         done
     done
 fi
 
-# 3. Sondagem para LSI / MegaRAID
+# 3. Varredura Otimizada para LSI / MegaRAID
 if lspci | grep -i -E "MegaRAID|LSI Logic" >/dev/null 2>&1; then
-    for dev in $BLOCK_DEVS; do
-        for id in {0..15}; do
+    for dev in /dev/sd[a-z]; do
+        [ -e "$dev" ] || continue
+        for id in {0..3}; do
             if sudo /usr/sbin/smartctl -i -d megaraid,$id "$dev" >/dev/null 2>&1; then
                 add_disk "$dev" "megaraid,$id" "$(basename "$dev")_mega_$id"
+                break
             fi
         done
     done
