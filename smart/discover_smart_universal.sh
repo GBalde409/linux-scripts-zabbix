@@ -21,16 +21,14 @@ while read -r line; do
     add_disk "$path" "$type" "$name"
 done < <(sudo /usr/sbin/smartctl --scan)
 
-# 2. Varredura Otimizada para HP Smart Array (Procura apenas controladoras reais e evita loops cegos)
+# Trecho corrigido para a parte HP no script do GitHub:
 if lspci | grep -i -E "Hewlett-Packard Company Smart Array" >/dev/null 2>&1; then
-    # Descobre dinamicamente quais controladoras cciss ou volumes respondem instantaneamente
     for dev in /dev/sd[a-z]; do
         [ -e "$dev" ] || continue
-        # Testa apenas os primeiros IDs de forma rápida
-        for id in {0..3}; do
+        for id in {0..5}; do
+            # O truque está em garantir que o tipo use a variável $id corretamente
             if sudo /usr/sbin/smartctl -i -d cciss,$id "$dev" >/dev/null 2>&1; then
                 add_disk "$dev" "cciss,$id" "$(basename "$dev")_hp_$id"
-                break # Achou o disco válido neste device, pula para o próximo
             fi
         done
     done
