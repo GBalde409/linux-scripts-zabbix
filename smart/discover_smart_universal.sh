@@ -25,6 +25,11 @@ while read -r line; do
         fi
     fi
     
+    # VALIDAÇÃO CRÍTICA: Testa se o disco responde ao SMART. Se falhar, é volume virtual e deve ser ignorado.
+    if ! sudo /usr/sbin/smartctl -H -d "$type" "$path" >/dev/null 2>&1; then
+        continue
+    fi
+    
     name=$(basename "$path")
     add_disk "$path" "$type" "$name"
 done < <(sudo /usr/sbin/smartctl --scan)
