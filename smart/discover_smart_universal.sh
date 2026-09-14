@@ -39,15 +39,18 @@ while read -r line; do
 done < <(sudo /usr/sbin/smartctl --scan)
 
 # 2. Controladoras HP Smart Array
-# Usa apenas o primeiro dispositivo de bloco como portal para evitar o efeito fantasma
-hp_portal=$(sudo /usr/sbin/smartctl --scan | grep -iE "/dev/sd|/dev/cciss" | head -n 1 | awk '{print $1}')
-
-if [ -n "$hp_portal" ]; then
-    for i in {0..15}; do
-        if sudo /usr/sbin/smartctl -H -d cciss,$i "$hp_portal" >/dev/null 2>&1; then
-            add_disk "$hp_portal" "cciss,$i" "hp_bay_$i"
-        fi
-    done
+if lspci | grep -i -E "Hewlett-Packard|Smart Array" >/dev/null 2>&1; then
+    # Pega apenas o primeiro disco lógico gerado pela HP para servir como portal
+    hp_portal=$(ls /dev/sd[a-z] 2>/dev/null | head -n 1)
+    
+    if [ -n "$hp_portal" ]; then
+        for id in {0..15}; do
+            # Usando -i (Info) para garantir a compatibilidade com todas as iLOs
+            if sudo /usr/sbin/smartctl -i -d cciss,$id "$hp_portal" >/dev/null 2>&1; then
+                add_disk "$hp_portal" "cciss,$id" "hp_bay_$id"
+            fi
+        done
+    fi
 fi
 
 # 3. Varredura Otimizada para LSI / MegaRAID
