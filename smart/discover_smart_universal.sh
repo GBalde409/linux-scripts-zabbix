@@ -17,19 +17,23 @@ while read -r line; do
     if [[ -z "$line" || "$line" == "#"* ]]; then continue; fi
     path=$(echo "$line" | awk '{print $1}')
     type=$(echo "$line" | awk '{print $3}')
-    
-    # Inteligência extra: Se o Proxmox classificar como scsi genérico, tenta forçar sat (SATA)
+
     if [ "$type" == "scsi" ]; then
         if sudo /usr/sbin/smartctl -a -d sat "$path" | grep -q "SMART overall"; then
             type="sat"
         fi
     fi
-    
-    # VALIDAÇÃO CRÍTICA: Testa se o disco responde ao SMART. Se falhar, é volume virtual e deve ser ignorado.
+
+    # VALIDAÇÃO 1: Falha se não responder ao SMART
     if ! sudo /usr/sbin/smartctl -H -d "$type" "$path" >/dev/null 2>&1; then
         continue
     fi
-    
+
+    # VALIDAÇÃO 2 (NOVA): Ignora Volumes Virtuais da Dell PERC e outras controladoras
+    if sudo /usr/sbin/smartctl -i -d "$type" "$path" | grep -iE "PERC|Virtual|Logical|RAID|MegaSR" >/dev/null 2>&1; then
+        continue
+    fi
+
     name=$(basename "$path")
     add_disk "$path" "$type" "$name"
 done < <(sudo /usr/sbin/smartctl --scan)
