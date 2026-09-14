@@ -38,16 +38,15 @@ while read -r line; do
     add_disk "$path" "$type" "$name"
 done < <(sudo /usr/sbin/smartctl --scan)
 
-# Trecho corrigido para a parte HP no script do GitHub:
-if lspci | grep -i -E "Hewlett-Packard Company Smart Array" >/dev/null 2>&1; then
-    for dev in /dev/sd[a-z]; do
-        [ -e "$dev" ] || continue
-        for id in {0..5}; do
-            # O truque está em garantir que o tipo use a variável $id corretamente
-            if sudo /usr/sbin/smartctl -i -d cciss,$id "$dev" >/dev/null 2>&1; then
-                add_disk "$dev" "cciss,$id" "$(basename "$dev")_hp_$id"
-            fi
-        done
+# 2. Controladoras HP Smart Array
+# Usa apenas o primeiro dispositivo de bloco como portal para evitar o efeito fantasma
+hp_portal=$(sudo /usr/sbin/smartctl --scan | grep -iE "/dev/sd|/dev/cciss" | head -n 1 | awk '{print $1}')
+
+if [ -n "$hp_portal" ]; then
+    for i in {0..15}; do
+        if sudo /usr/sbin/smartctl -H -d cciss,$i "$hp_portal" >/dev/null 2>&1; then
+            add_disk "$hp_portal" "cciss,$i" "hp_bay_$i"
+        fi
     done
 fi
 
