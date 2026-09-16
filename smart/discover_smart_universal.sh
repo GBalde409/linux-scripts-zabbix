@@ -29,8 +29,8 @@ while read -r line; do
         continue
     fi
 
-    # VALIDAÇÃO 2 (NOVA): Ignora Volumes Virtuais da Dell PERC e outras controladoras
-    if sudo /usr/sbin/smartctl -i -d "$type" "$path" | grep -iE "PERC|Virtual|Logical|RAID|MegaSR" >/dev/null 2>&1; then
+    # VALIDAÇÃO 2 (CORRIGIDA): Ignora Volumes Virtuais olhando apenas para o campo de Modelo/Fabricante
+    if sudo /usr/sbin/smartctl -i -d "$type" "$path" | grep -iE "^(Device Model|Model Family|Vendor|Product):" | grep -iE "PERC|Virtual|Logical|RAID|MegaSR" >/dev/null 2>&1; then
         continue
     fi
 
