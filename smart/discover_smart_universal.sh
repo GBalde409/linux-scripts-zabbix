@@ -18,6 +18,10 @@ while read -r line; do
     path=$(echo "$line" | awk '{print $1}')
     type=$(echo "$line" | awk '{print $3}')
 
+if [[ "$type" == *"megaraid"* || "$type" == *"cciss"* ]]; then
+        continue
+    fi
+   
     if [ "$type" == "scsi" ]; then
         if sudo /usr/sbin/smartctl -a -d sat "$path" | grep -q "SMART overall"; then
             type="sat"
