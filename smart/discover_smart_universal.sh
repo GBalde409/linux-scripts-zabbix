@@ -29,7 +29,7 @@ while read -r line; do
         continue
     fi
 
-    # VALIDAÇÃO 2 (CORRIGIDA): Ignora Volumes Virtuais olhando apenas para o campo de Modelo/Fabricante
+    # VALIDAÇÃO 2: Ignora Volumes Virtuais olhando apenas para o campo de Modelo/Fabricante
     if sudo /usr/sbin/smartctl -i -d "$type" "$path" | grep -iE "^(Device Model|Model Family|Vendor|Product):" | grep -iE "PERC|Virtual|Logical|RAID|MegaSR" >/dev/null 2>&1; then
         continue
     fi
@@ -53,17 +53,20 @@ if lspci | grep -i -E "Hewlett-Packard|Smart Array" >/dev/null 2>&1; then
     fi
 fi
 
-# 3. Varredura Otimizada para LSI / MegaRAID
+# 3. Varredura Otimizada para LSI / MegaRAID (CORRIGIDO)
 if lspci | grep -i -E "MegaRAID|LSI Logic" >/dev/null 2>&1; then
-    for dev in /dev/sd[a-z]; do
-        [ -e "$dev" ] || continue
-        for id in {0..3}; do
-            if sudo /usr/sbin/smartctl -i -d megaraid,$id "$dev" >/dev/null 2>&1; then
-                add_disk "$dev" "megaraid,$id" "$(basename "$dev")_mega_$id"
-                break
+    # Pega apenas o primeiro disco lógico para servir como portal (evita duplicação)
+    lsi_portal=$(ls /dev/sd[a-z] 2>/dev/null | head -n 1)
+    
+    if [ -n "$lsi_portal" ]; then
+        # Expandido para 15 para cobrir servidores com backplanes maiores (antes estava {0..3})
+        for id in {0..15}; do
+            if sudo /usr/sbin/smartctl -i -d megaraid,$id "$lsi_portal" >/dev/null 2>&1; then
+                # Nomeia de forma padronizada, independente do disco lógico usado como portal
+                add_disk "$lsi_portal" "megaraid,$id" "mega_$id"
             fi
         done
-    done
+    fi
 fi
 
 echo "]"
