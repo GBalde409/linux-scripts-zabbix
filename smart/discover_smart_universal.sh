@@ -18,7 +18,7 @@ while read -r line; do
     path=$(echo "$line" | awk '{print $1}')
     type=$(echo "$line" | awk '{print $3}')
 
-if [[ "$type" == *"megaraid"* || "$type" == *"cciss"* ]]; then
+if [[ "$path" == *"/bus/"* || "$type" == *"megaraid"* || "$type" == *"cciss"* ]]; then
         continue
     fi
    
